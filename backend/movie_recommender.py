@@ -134,20 +134,28 @@ def load_and_preprocess_data():
 # ---------------------------------------------------------------------------
 
 def train_tfidf_and_similarity(df):
+    """
+    Build and return only the TF-IDF vectorizer and sparse matrix.
+    The full N×N cosine-similarity matrix is NOT precomputed — it costs
+    ~200 MB per worker for 5 000 movies and causes OOM on free-tier hosts.
+    Per-query row similarity is computed on-demand in _compute_scores.
+    """
     tfidf        = TfidfVectorizer(stop_words='english')
     tfidf_matrix = tfidf.fit_transform(df['tags'])
-    similarity   = cosine_similarity(tfidf_matrix)
-    return tfidf, tfidf_matrix, similarity
+    return tfidf, tfidf_matrix, None   # third value kept for API compatibility
 
 
 # ---------------------------------------------------------------------------
 # Core scoring logic (shared between CLI and API)
 # ---------------------------------------------------------------------------
 
-def _compute_scores(query, df, tfidf, tfidf_matrix, similarity):
+def _compute_scores(query, df, tfidf, tfidf_matrix, _similarity_unused):
     """
     Returns (top_idx, sim_scores, final_scores, match_indices).
     top_idx is a list of up to 12 integer row positions.
+
+    Similarity is computed on-demand from the sparse tfidf_matrix using
+    efficient dot-product slices — no precomputed N×N matrix is needed.
     """
     query_lower = query.lower()
     matches = df[df['tags'].str.lower().str.contains(query_lower, na=False)]
@@ -155,9 +163,11 @@ def _compute_scores(query, df, tfidf, tfidf_matrix, similarity):
     if not matches.empty:
         match_indices = [df.index.get_loc(i) for i in matches.index[:8]]
 
+        # Compute similarity only for matched rows (sparse → dense slice)
         candidate_scores = np.zeros(len(df))
         for match_idx in match_indices:
-            candidate_scores += similarity[match_idx]
+            row_vec = tfidf_matrix[match_idx]           # (1, vocab) sparse
+            candidate_scores += cosine_similarity(row_vec, tfidf_matrix)[0]
         sim_scores = candidate_scores / len(match_indices)
 
         target_genres = set()

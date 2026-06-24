@@ -20,9 +20,11 @@ COPY . .
 # Expose the API port
 EXPOSE 8000
 
-# Worker count: 2 * CPU_cores + 1 is a common heuristic.
-# Override at runtime: docker run -e WEB_CONCURRENCY=4 ...
-ENV WEB_CONCURRENCY=2
+# Worker count: keep at 1 on Render's free tier (512 MB RAM).
+# Each gunicorn worker forks a full copy of the model in memory, so 2 workers
+# can easily exceed 512 MB. Upgrade your Render plan before increasing this.
+# Override at runtime: docker run -e WEB_CONCURRENCY=2 ...
+ENV WEB_CONCURRENCY=1
 
 # Run with gunicorn + uvicorn workers for production throughput
 CMD ["sh", "-c", "gunicorn main:app -k uvicorn.workers.UvicornWorker --workers $WEB_CONCURRENCY --bind 0.0.0.0:8000 --timeout 120 --graceful-timeout 30"]
