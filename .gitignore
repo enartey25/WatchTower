@@ -1,0 +1,41 @@
+# === Secrets & environment ===
+# Real env files — NEVER commit
+.env
+*.env
+.env.*
+# Allow example/template files (safe to commit)
+!*.env.example
+!**/.env.example
+
+# === Python ===
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+.venv/
+venv/
+env/
+*.egg-info/
+
+# === Data (generated cache only — CSVs are committed for Docker builds) ===
+backend/data/poster_cache.json
+
+# === Node ===
+node_modules/
+frontend/dist/
+frontend/.vite/
+
+# === OS ===
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# === IDE ===
+.vscode/
+.idea/
+*.suo
+*.user
+
+# === Docker ===
+*.log

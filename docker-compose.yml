@@ -1,0 +1,49 @@
+# ============================================================
+# WatchTower — Docker Compose
+# Runs the full stack: FastAPI backend + nginx frontend
+#
+# Usage:
+#   1. Fill in backend/.env (copy backend/.env.example)
+#   2. Set VITE_API_URL below to your backend's public URL
+#   3. docker compose up -d
+# ============================================================
+
+version: "3.9"
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    env_file:
+      - ./backend/.env
+    environment:
+      - WEB_CONCURRENCY=${WEB_CONCURRENCY:-2}
+    volumes:
+      # Mount the data directory so CSVs and poster cache persist
+      - ./backend/data:/app/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s   # Give the TF-IDF model time to load
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        # Set this to your backend's public URL in production.
+        # Leave empty to use the nginx proxy (requires extra nginx setup).
+        # Example: VITE_API_URL=https://api.yourdomain.com
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:8000}
+    ports:
+      - "80:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped

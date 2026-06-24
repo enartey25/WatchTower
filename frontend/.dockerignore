@@ -1,0 +1,29 @@
+# ============================================================
+# WatchTower Frontend — .dockerignore
+# ============================================================
+
+# Dependencies — installed fresh inside the build stage
+node_modules/
+
+# Built output — produced inside the container
+dist/
+.vite/
+
+# Secrets
+.env
+*.env
+
+# Dev tooling
+.idea/
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
