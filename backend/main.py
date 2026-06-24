@@ -31,7 +31,7 @@ load_dotenv(dotenv_path=os.path.join(_BASE_DIR, ".env"))
 app = FastAPI(
     title="WatchTower API",
     description="TF-IDF Movie Recommendation Engine",
-    version="1.0.0",
+    version="1.1.0",
 )
 
 # Read allowed origins from env — supports both dev and production
