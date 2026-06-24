@@ -14,6 +14,7 @@ import requests as http_requests
 import pandas as pd
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Query
+from fastapi.responses import RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
@@ -255,6 +256,12 @@ class RecommendRequest(BaseModel):
 class WatchlistAddRequest(BaseModel):
     user_id: str
     movie: dict
+
+
+@app.get("/", include_in_schema=False)
+def root():
+    """Redirect bare URL visits to the interactive API docs."""
+    return RedirectResponse(url="/docs")
 
 
 @app.get("/api/health")
