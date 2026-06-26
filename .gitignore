@@ -18,8 +18,9 @@ venv/
 env/
 *.egg-info/
 
-# === Data (generated cache only — CSVs are committed for Docker builds) ===
+# === Data (too large for GitHub — backend loads from Supabase in production) ===
 backend/data/poster_cache.json
+backend/data/*.csv
 
 # === Node ===
 node_modules/

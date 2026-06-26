@@ -40,13 +40,10 @@ export default function Home() {
           <div className="backend-banner">
             <span className="backend-banner__icon"><IconAlert /></span>
             <div className="backend-banner__text">
-              <p className="backend-banner__title">Backend not detected</p>
+              <p className="backend-banner__title">Could not reach the backend</p>
               <p className="backend-banner__body">
-                Start the FastAPI server so trending movies can load and recommendations work.
+                The recommendation engine is warming up or temporarily unavailable. Please wait a moment and refresh.
               </p>
-              <code className="backend-banner__code">
-                cd backend &amp;&amp; uvicorn main:app --reload --port 8000
-              </code>
             </div>
           </div>
         )}

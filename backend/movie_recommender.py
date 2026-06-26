@@ -33,17 +33,52 @@ def load_and_preprocess_data():
     if database_url:
         try:
             import psycopg2
-            
+
             conn = psycopg2.connect(database_url)
-            # Fetch df1 and df2 matching the CSV schema
-            df1 = pd.read_sql_query("SELECT id, original_title, title, original_language, overview, tagline, release_date, popularity, vote_average, vote_count, genres, keywords, production_companies, production_countries, spoken_languages FROM movies", conn)
-            df2 = pd.read_sql_query("SELECT id as movie_id, title, cast_data as cast, crew FROM movies", conn)
+            conn.autocommit = True
+
+            # Set a longer statement timeout for the data-loading connection (5 minutes)
+            cur = conn.cursor()
+            cur.execute("SET statement_timeout = '300000'")
+            cur.close()
+
+            # Load in paginated chunks to avoid timeout on large datasets
+            CHUNK = 2000
+            df1_chunks, df2_chunks = [], []
+            offset = 0
+            while True:
+                chunk = pd.read_sql_query(
+                    f"SELECT id, original_title, title, original_language, overview, tagline, "
+                    f"release_date, popularity, vote_average, vote_count, genres, keywords, "
+                    f"production_companies, production_countries, spoken_languages "
+                    f"FROM movies ORDER BY id LIMIT {CHUNK} OFFSET {offset}",
+                    conn
+                )
+                if chunk.empty:
+                    break
+                df1_chunks.append(chunk)
+                offset += CHUNK
+            df1 = pd.concat(df1_chunks, ignore_index=True)
+
+            offset = 0
+            while True:
+                chunk = pd.read_sql_query(
+                    f"SELECT id as movie_id, title, cast_data as cast, crew "
+                    f"FROM movies ORDER BY id LIMIT {CHUNK} OFFSET {offset}",
+                    conn
+                )
+                if chunk.empty:
+                    break
+                df2_chunks.append(chunk)
+                offset += CHUNK
+            df2 = pd.concat(df2_chunks, ignore_index=True)
+
             conn.close()
 
             # Map release_date to release_year
             df1['release_date'] = pd.to_datetime(df1['release_date'], errors='coerce').dt.year
             loaded_from_db = True
-            print("[WATCHTOWER] Successfully loaded movie dataset from Supabase database.")
+            print(f"[WATCHTOWER] Successfully loaded {len(df1)} movies from Supabase database.")
         except Exception as exc:
             print(f"[WATCHTOWER] Database load failed: {exc}. Falling back to CSVs...")
 
@@ -161,7 +196,7 @@ def _compute_scores(query, df, tfidf, tfidf_matrix, _similarity_unused):
     matches = df[df['tags'].str.lower().str.contains(query_lower, na=False)]
 
     if not matches.empty:
-        match_indices = [df.index.get_loc(i) for i in matches.index[:8]]
+        match_indices = [df.index.get_loc(i) for i in matches.index[:15]]
 
         # Compute similarity only for matched rows (sparse → dense slice)
         candidate_scores = np.zeros(len(df))
@@ -204,10 +239,10 @@ def _compute_scores(query, df, tfidf, tfidf_matrix, _similarity_unused):
     top_idx = np.argsort(final_scores)[::-1]
 
     if match_indices:
-        top_idx = [i for i in top_idx if i not in match_indices][:12]
+        top_idx = [i for i in top_idx if i not in match_indices][:30]
     else:
         fallback_idx = int(np.argmax(sim_scores))
-        top_idx = [i for i in top_idx if i != fallback_idx][:12]
+        top_idx = [i for i in top_idx if i != fallback_idx][:30]
 
     return top_idx, sim_scores, final_scores, match_indices
 

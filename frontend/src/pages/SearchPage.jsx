@@ -113,7 +113,7 @@ export default function SearchPage() {
         <>
           <div className="search-page__section-label">Direct Matches</div>
           <div className="search-grid">
-            {Array.from({ length: 4 }).map((_, i) => (
+            {Array.from({ length: 15 }).map((_, i) => (
               <div key={i}>
                 <div className="skeleton skeleton-card" />
                 <div className="skeleton skeleton-label" style={{ width: '72%' }} />
@@ -123,7 +123,7 @@ export default function SearchPage() {
           </div>
           <div className="search-page__section-label" style={{ marginTop: 40 }}>Recommendations</div>
           <div className="search-grid">
-            {Array.from({ length: 12 }).map((_, i) => (
+            {Array.from({ length: 30 }).map((_, i) => (
               <div key={i}>
                 <div className="skeleton skeleton-card" />
                 <div className="skeleton skeleton-label" style={{ width: '72%' }} />
