@@ -34,23 +34,24 @@ def load_and_preprocess_data():
         try:
             import psycopg2
 
-            conn = psycopg2.connect(database_url)
-            conn.autocommit = True
+            # Switch to session pooler port (5432) — supports connection-level options.
+            # Transaction pooler (6543) strips SET commands; options= works on 5432.
+            db_url = database_url.replace(":6543/", ":5432/")
+            conn = psycopg2.connect(
+                db_url,
+                connect_timeout=30,
+                options="-c statement_timeout=300000"  # 5-minute timeout per query
+            )
 
-            # Set a longer statement timeout for the data-loading connection (5 minutes)
-            cur = conn.cursor()
-            cur.execute("SET statement_timeout = '300000'")
-            cur.close()
-
-            # Load in paginated chunks to avoid timeout on large datasets
-            CHUNK = 2000
+            # Load in paginated chunks of 1000 rows to avoid any per-query size limits
+            CHUNK = 1000
             df1_chunks, df2_chunks = [], []
             offset = 0
             while True:
                 chunk = pd.read_sql_query(
-                    f"SELECT id, original_title, title, original_language, overview, tagline, "
-                    f"release_date, popularity, vote_average, vote_count, genres, keywords, "
-                    f"production_companies, production_countries, spoken_languages "
+                    "SELECT id, original_title, title, original_language, overview, tagline, "
+                    "release_date, popularity, vote_average, vote_count, genres, keywords, "
+                    "production_companies, production_countries, spoken_languages "
                     f"FROM movies ORDER BY id LIMIT {CHUNK} OFFSET {offset}",
                     conn
                 )
@@ -58,12 +59,13 @@ def load_and_preprocess_data():
                     break
                 df1_chunks.append(chunk)
                 offset += CHUNK
+                print(f"[WATCHTOWER] Loaded rows {offset - CHUNK}..{offset}", flush=True)
             df1 = pd.concat(df1_chunks, ignore_index=True)
 
             offset = 0
             while True:
                 chunk = pd.read_sql_query(
-                    f"SELECT id as movie_id, title, cast_data as cast, crew "
+                    "SELECT id as movie_id, title, cast_data as cast, crew "
                     f"FROM movies ORDER BY id LIMIT {CHUNK} OFFSET {offset}",
                     conn
                 )
@@ -75,18 +77,23 @@ def load_and_preprocess_data():
 
             conn.close()
 
-            # Map release_date to release_year
             df1['release_date'] = pd.to_datetime(df1['release_date'], errors='coerce').dt.year
             loaded_from_db = True
-            print(f"[WATCHTOWER] Successfully loaded {len(df1)} movies from Supabase database.")
+            print(f"[WATCHTOWER] Successfully loaded {len(df1)} movies from Supabase.")
         except Exception as exc:
             print(f"[WATCHTOWER] Database load failed: {exc}. Falling back to CSVs...")
 
     if not loaded_from_db:
-        # Fallback to local CSV files
-        df1 = pd.read_csv(os.path.join(DATA_DIR, 'tmdb_5000_movies.csv'))
-        df2 = pd.read_csv(os.path.join(DATA_DIR, 'tmdb_5000_credits.csv'))
-        df1 = df1.drop(['budget', 'homepage', 'revenue', 'runtime'], axis=1)
+        csv_movies = os.path.join(DATA_DIR, 'tmdb_5000_movies.csv')
+        csv_credits = os.path.join(DATA_DIR, 'tmdb_5000_credits.csv')
+        if not os.path.exists(csv_movies) or not os.path.exists(csv_credits):
+            raise RuntimeError(
+                "[WATCHTOWER] FATAL: Supabase load failed and no local CSV fallback found. "
+                "Ensure DATABASE_URL is set correctly in your environment."
+            )
+        df1 = pd.read_csv(csv_movies)
+        df2 = pd.read_csv(csv_credits)
+        df1 = df1.drop([c for c in ['budget', 'homepage', 'revenue', 'runtime'] if c in df1.columns], axis=1)
         df1['release_date'] = pd.to_datetime(df1['release_date'], errors='coerce').dt.year
 
     def extract_words(text):
